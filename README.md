@@ -73,3 +73,8 @@ React only renders the HUD and menus. The game loop, simulation and canvas rende
 - TypeScript (strict)
 - Vite
 - Canvas 2D and the Web Audio API
+
+## Credits
+
+- [NarihitoM](https://github.com/NarihitoM)
+- Claude Opus 5.5 (co-author)
