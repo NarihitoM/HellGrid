@@ -10,6 +10,7 @@ A wave-based first person shooter that runs in the browser, built with React, Ty
 - Aim down sights on every weapon, plus a sniper rifle with a 2.5x / 5x scope that can shoot through several enemies
 - Four weapons unlocked as the waves progress: pistol, shotgun, rifle and sniper
 - Three enemy types (melee grunt, ranged gunner, heavy brute) that path-find toward the player
+- Optional AI squad of up to three teammates (Alpha, Bravo, Charlie) who follow you, shoot enemies, draw their attention, and get back up at the start of the next wave if they go down
 - Health and ammo pickups, enemy loot drops, score and a saved best score
 - Procedurally generated textures, sprites and sound effects, so there are no image or audio files
 - Minimap, HUD, pause menu and adjustable mouse sensitivity
@@ -37,7 +38,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL shown in the terminal and click **Deploy** to start. The game captures the mouse while you play; press Esc to release it.
+Open the local URL shown in the terminal, pick an **AI squad** size (Solo, +1, +2 or +3) and click **Deploy** to start. The game captures the mouse while you play; press Esc to release it. The squad size is saved and can also be changed on the game-over screen.
 
 ## Scripts
 
@@ -47,7 +48,7 @@ Open the local URL shown in the terminal and click **Deploy** to start. The game
 | `npm run build` | Type-check and build for production into `dist/` |
 | `npm run preview` | Serve the production build locally |
 | `npm run lint` | Lint with Oxlint |
-| `npm run check` | Run the engine checks (map layout, raycasting, line of sight, enemy path-finding) |
+| `npm run check` | Run the engine checks (map layout, raycasting, line of sight, enemy path-finding, AI squad combat) |
 
 ## Project structure
 

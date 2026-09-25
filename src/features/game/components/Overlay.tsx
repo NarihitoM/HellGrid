@@ -1,3 +1,4 @@
+import { MAX_SQUAD } from '../engine/world.ts'
 import type { GameResult, Phase } from '../types/types.ts'
 
 interface OverlayProps {
@@ -5,10 +6,41 @@ interface OverlayProps {
   result: GameResult | null
   best: number
   sensitivity: number
+  squad: number
   onStart: () => void
   onResume: () => void
   onQuit: () => void
   onSensitivity: (value: number) => void
+  onSquad: (value: number) => void
+}
+
+interface SquadPickerProps {
+  squad: number
+  onSquad: (value: number) => void
+}
+
+const SQUAD_OPTIONS = Array.from({ length: MAX_SQUAD + 1 }, (_, size) => size)
+
+function SquadPicker({ squad, onSquad }: SquadPickerProps) {
+  return (
+    <div className="squad-picker">
+      <span className="squad-label">AI squad</span>
+      <div className="squad-options" role="radiogroup" aria-label="AI squad size">
+        {SQUAD_OPTIONS.map((size) => (
+          <button
+            key={size}
+            type="button"
+            role="radio"
+            aria-checked={size === squad}
+            className={`squad-option ${size === squad ? 'is-active' : ''}`}
+            onClick={() => onSquad(size)}
+          >
+            {size === 0 ? 'Solo' : `+${size}`}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 const CONTROLS: [string, string][] = [
@@ -23,7 +55,18 @@ const CONTROLS: [string, string][] = [
   ['Esc', 'Pause'],
 ]
 
-export function Overlay({ phase, result, best, sensitivity, onStart, onResume, onQuit, onSensitivity }: OverlayProps) {
+export function Overlay({
+  phase,
+  result,
+  best,
+  sensitivity,
+  squad,
+  onStart,
+  onResume,
+  onQuit,
+  onSensitivity,
+  onSquad,
+}: OverlayProps) {
   if (phase === 'playing') return null
 
   if (phase === 'paused') {
@@ -81,6 +124,7 @@ export function Overlay({ phase, result, best, sensitivity, onStart, onResume, o
               <dd>{result.best.toLocaleString()}</dd>
             </div>
           </dl>
+          <SquadPicker squad={squad} onSquad={onSquad} />
           <div className="actions">
             <button type="button" className="button is-primary" onClick={onStart}>
               Play again
@@ -100,6 +144,7 @@ export function Overlay({ phase, result, best, sensitivity, onStart, onResume, o
         <p className="eyebrow">A raycast survival shooter</p>
         <h1 className="logo">Hellgrid</h1>
         <p className="tagline">Hold the halls. Survive the waves. Earn heavier guns.</p>
+        <SquadPicker squad={squad} onSquad={onSquad} />
         <button type="button" className="button is-primary is-large" onClick={onStart}>
           Deploy
         </button>

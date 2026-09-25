@@ -81,8 +81,112 @@
   align-items: flex-end;
 }
 
+.hud-left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .hud-vitals {
   min-width: 190px;
+}
+
+.hud-squad {
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  list-style: none;
+}
+
+.hud-squad li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 12px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hud-squad .health-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  margin-top: 4px;
+}
+
+.hud-squad .health-fill {
+  background: #4fd1ff;
+}
+
+.squad-name {
+  color: #4fd1ff;
+}
+
+.squad-health {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-squad li.is-down {
+  opacity: 0.45;
+}
+
+.hud-squad li.is-down .squad-health {
+  color: var(--danger);
+}
+
+.squad-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 24px;
+}
+
+.squad-label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.squad-options {
+  display: flex;
+  gap: 6px;
+}
+
+.squad-option {
+  min-width: 56px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.squad-option:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.squad-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.squad-option.is-active {
+  color: #04161d;
+  background: #4fd1ff;
+  border-color: #4fd1ff;
 }
 
 .health-bar {

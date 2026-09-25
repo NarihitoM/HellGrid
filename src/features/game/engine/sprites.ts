@@ -263,6 +263,67 @@ function drawGunner(ctx: Ctx, pose: Pose) {
   if (pose === 'attack') burstFlash(ctx, 42, 37, 11)
 }
 
+function drawSoldier(ctx: Ctx, pose: Pose) {
+  const armor = '#3f8a70'
+  const dark = '#1d3a31'
+  const light = '#93d9bd'
+  const cloth = '#2c3a2f'
+
+  if (pose === 'dead') {
+    oval(ctx, 32, 59, 27, 4.5, '#3a0a06')
+    ctx.fillStyle = armor
+    ctx.beginPath()
+    ctx.roundRect(14, 51, 26, 8, 3)
+    ctx.fill()
+    oval(ctx, 45, 54, 6, 5, shaded(ctx, 45, 54, 6, light, dark))
+    ctx.fillStyle = cloth
+    ctx.fillRect(4, 55, 12, 4)
+    ctx.fillStyle = '#16181b'
+    ctx.fillRect(20, 60, 22, 2)
+    return
+  }
+
+  const step = pose === 'walkA' ? 1 : pose === 'walkB' ? -1 : 0
+
+  limb(ctx, 27, 43, 25 + step * 4, 60, 7, cloth)
+  limb(ctx, 37, 43, 39 - step * 4, 60, 7, cloth)
+  oval(ctx, 24 + step * 4, 61.5, 5, 2.2, '#121412')
+  oval(ctx, 40 - step * 4, 61.5, 5, 2.2, '#121412')
+
+  const torso = ctx.createLinearGradient(21, 22, 43, 45)
+  torso.addColorStop(0, light)
+  torso.addColorStop(1, dark)
+  ctx.fillStyle = torso
+  ctx.beginPath()
+  ctx.roundRect(21, 22, 22, 22, 5)
+  ctx.fill()
+  ctx.fillStyle = dark
+  ctx.fillRect(24, 30, 16, 2)
+  ctx.fillRect(24, 35, 16, 2)
+  oval(ctx, 20, 25, 5, 4, shaded(ctx, 20, 25, 5, light, armor))
+  oval(ctx, 44, 25, 5, 4, shaded(ctx, 44, 25, 5, light, armor))
+
+  oval(ctx, 32, 14, 7.5, 7.5, shaded(ctx, 32, 14, 8, light, dark))
+  ctx.fillStyle = dark
+  ctx.fillRect(24, 8, 16, 3)
+  ctx.shadowColor = '#5ee3ff'
+  ctx.shadowBlur = 5
+  ctx.fillStyle = '#5ee3ff'
+  ctx.fillRect(27, 13, 10, 3)
+  ctx.shadowBlur = 0
+
+  limb(ctx, 21, 27, 24, 37, 5, armor)
+  limb(ctx, 43, 27, 38, 35, 5, armor)
+  ctx.fillStyle = '#1b1d21'
+  ctx.fillRect(18, 33, 28, 5)
+  ctx.fillRect(40, 31, 12, 3)
+  ctx.fillRect(26, 37, 4, 6)
+  oval(ctx, 24, 37, 3, 3, dark)
+  oval(ctx, 38, 35, 3, 3, dark)
+
+  if (pose === 'attack') burstFlash(ctx, 54, 32, 10)
+}
+
 function beastFrames(palette: BeastPalette): EnemyFrames {
   const walkA = draw(64, (ctx) => drawBeast(ctx, 'walkA', palette))
   return {
@@ -282,6 +343,17 @@ function gunnerFrames(): EnemyFrames {
     attack: draw(64, (ctx) => drawGunner(ctx, 'attack')),
     pain: tint(walkA, 0.55),
     dead: draw(64, (ctx) => drawGunner(ctx, 'dead')),
+  }
+}
+
+function soldierFrames(): EnemyFrames {
+  const walkA = draw(64, (ctx) => drawSoldier(ctx, 'walkA'))
+  return {
+    walkA,
+    walkB: draw(64, (ctx) => drawSoldier(ctx, 'walkB')),
+    attack: draw(64, (ctx) => drawSoldier(ctx, 'attack')),
+    pain: tint(walkA, 0.55),
+    dead: draw(64, (ctx) => drawSoldier(ctx, 'dead')),
   }
 }
 
@@ -364,3 +436,15 @@ export const PICKUP_SPRITES: Record<PickupKind, Sprite> = {
 }
 
 export const FIREBALL_SPRITE = fireball
+
+export const ALLY_SPRITES = soldierFrames()
+
+export const ALLY_MARKER = draw(16, (ctx) => {
+  ctx.fillStyle = '#4ade80'
+  ctx.beginPath()
+  ctx.moveTo(2, 3)
+  ctx.lineTo(14, 3)
+  ctx.lineTo(8, 13)
+  ctx.closePath()
+  ctx.fill()
+})

@@ -1,6 +1,15 @@
 import { MAP_H, MAP_W, tileAt } from './map.ts'
 import { castRay, createRayHit } from './nav.ts'
-import { ENEMY_SPRITES, FIREBALL_SPRITE, PARTICLE_SPRITES, PICKUP_SPRITES, createCanvas, type Sprite } from './sprites.ts'
+import {
+  ALLY_MARKER,
+  ALLY_SPRITES,
+  ENEMY_SPRITES,
+  FIREBALL_SPRITE,
+  PARTICLE_SPRITES,
+  PICKUP_SPRITES,
+  createCanvas,
+  type Sprite,
+} from './sprites.ts'
 import { CEILING_TEXTURE, FLOOR_TEXTURE, TEX_MASK, TEX_SHIFT, TEX_SIZE, WALL_TEXTURES } from './textures.ts'
 import { drawViewModel } from './viewmodels.ts'
 import { WEAPONS } from './weapons.ts'
@@ -221,6 +230,15 @@ export class Renderer {
       this.queueSprite(sprite, e.x, e.y, 0, ENEMY_STATS[e.kind].size, false)
     }
 
+    for (const a of world.allies) {
+      let sprite = Math.floor(a.walk) % 2 === 0 ? ALLY_SPRITES.walkA : ALLY_SPRITES.walkB
+      if (a.hp <= 0) sprite = ALLY_SPRITES.dead
+      else if (a.muzzle > 0) sprite = ALLY_SPRITES.attack
+      else if (a.flash > 0) sprite = ALLY_SPRITES.pain
+      this.queueSprite(sprite, a.x, a.y, 0, 0.9, false)
+      if (a.hp > 0) this.queueSprite(ALLY_MARKER, a.x, a.y, 0.95 + Math.sin(world.time * 4) * 0.02, 0.1, true)
+    }
+
     for (const pickup of world.pickups) {
       if (!pickup.active) continue
       const hover = 0.03 + Math.sin(world.time * 3 + pickup.x * 2) * 0.03
@@ -434,6 +452,11 @@ export class Renderer {
     ctx.fillStyle = '#ff3b30'
     for (const e of world.enemies) {
       if (e.state !== 'dead') ctx.fillRect(ox + e.x * cell - 1.5, oy + e.y * cell - 1.5, 3, 3)
+    }
+
+    ctx.fillStyle = '#4fd1ff'
+    for (const a of world.allies) {
+      if (a.hp > 0) ctx.fillRect(ox + a.x * cell - 1.5, oy + a.y * cell - 1.5, 3, 3)
     }
 
     const px = ox + p.x * cell

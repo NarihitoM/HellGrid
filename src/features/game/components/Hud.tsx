@@ -35,11 +35,26 @@ export function Hud({ hud }: HudProps) {
       )}
 
       <div className="hud-bottom">
-        <div className={`hud-panel hud-vitals ${healthTone}`}>
-          <span className="hud-label">Health</span>
-          <span className="hud-value hud-big">{hud.health}</span>
-          <div className="health-bar">
-            <div className="health-fill" style={{ width: `${hud.health}%` }} />
+        <div className="hud-left">
+          {hud.squad.length > 0 && (
+            <ul className="hud-panel hud-squad">
+              {hud.squad.map((member) => (
+                <li key={member.name} className={member.health <= 0 ? 'is-down' : ''}>
+                  <span className="squad-name">{member.name}</span>
+                  <span className="squad-health">{member.health > 0 ? member.health : 'Down'}</span>
+                  <div className="health-bar">
+                    <div className="health-fill" style={{ width: `${member.health}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className={`hud-panel hud-vitals ${healthTone}`}>
+            <span className="hud-label">Health</span>
+            <span className="hud-value hud-big">{hud.health}</span>
+            <div className="health-bar">
+              <div className="health-fill" style={{ width: `${hud.health}%` }} />
+            </div>
           </div>
         </div>
 

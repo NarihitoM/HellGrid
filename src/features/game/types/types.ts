@@ -51,6 +51,23 @@ export interface Enemy extends Point {
   flash: number
   strafe: number
   strafeTime: number
+  target: Ally | null
+}
+
+export interface Ally extends Point {
+  name: string
+  hp: number
+  cooldown: number
+  think: number
+  walk: number
+  flash: number
+  muzzle: number
+  target: Enemy | null
+}
+
+export interface SquadMember {
+  name: string
+  health: number
 }
 
 export interface Projectile extends Point {
@@ -86,6 +103,7 @@ export interface HudState {
   shells: number
   weapon: WeaponId
   owned: readonly WeaponId[]
+  squad: readonly SquadMember[]
   score: number
   wave: number
   enemiesLeft: number

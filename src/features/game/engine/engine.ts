@@ -2,7 +2,7 @@ import type { GameResult, HudState, Phase } from '../types/types.ts'
 import { Sfx } from './audio.ts'
 import { Input } from './input.ts'
 import { Renderer } from './renderer.ts'
-import { World } from './world.ts'
+import { MAX_SQUAD, World } from './world.ts'
 
 export interface EngineEvents {
   onHud: (hud: HudState) => void
@@ -14,11 +14,13 @@ const INTERNAL_WIDTH = 640
 const DEATH_DELAY = 1.8
 const BEST_KEY = 'hellgrid.best'
 const SENSITIVITY_KEY = 'hellgrid.sensitivity'
+const SQUAD_KEY = 'hellgrid.squad'
 
 export function loadNumber(key: string, fallback: number): number {
   try {
-    const value = Number(localStorage.getItem(key))
-    return Number.isFinite(value) && value > 0 ? value : fallback
+    const raw = localStorage.getItem(key)
+    const value = Number(raw)
+    return raw !== null && Number.isFinite(value) && value >= 0 ? value : fallback
   } catch {
     return fallback
   }
@@ -33,7 +35,8 @@ function saveNumber(key: string, value: number) {
 }
 
 export const loadBest = () => loadNumber(BEST_KEY, 0)
-export const loadSensitivity = () => loadNumber(SENSITIVITY_KEY, 1)
+export const loadSensitivity = () => loadNumber(SENSITIVITY_KEY, 1) || 1
+export const loadSquad = () => Math.min(MAX_SQUAD, Math.floor(loadNumber(SQUAD_KEY, 0)))
 
 function sameHud(a: HudState | null, b: HudState): boolean {
   if (!a) return false
@@ -59,6 +62,7 @@ export class Engine {
     this.input = new Input(canvas)
     this.renderer = new Renderer(canvas)
     this.world = new World(this.sfx)
+    this.world.squad = loadSquad()
 
     this.resize()
     window.addEventListener('resize', this.resize)
@@ -86,6 +90,11 @@ export class Engine {
   setSensitivity(value: number) {
     this.sensitivity = value
     saveNumber(SENSITIVITY_KEY, value)
+  }
+
+  setSquad(value: number) {
+    this.world.squad = value
+    saveNumber(SQUAD_KEY, value)
   }
 
   destroy() {

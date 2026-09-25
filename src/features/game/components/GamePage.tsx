@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Engine, loadBest, loadSensitivity } from '../engine/engine.ts'
+import { Engine, loadBest, loadSensitivity, loadSquad } from '../engine/engine.ts'
 import type { GameResult, HudState, Phase } from '../types/types.ts'
 import { Hud } from './Hud.tsx'
 import { Overlay } from './Overlay.tsx'
@@ -12,6 +12,7 @@ export function GamePage() {
   const [hud, setHud] = useState<HudState | null>(null)
   const [result, setResult] = useState<GameResult | null>(null)
   const [sensitivity, setSensitivity] = useState(loadSensitivity)
+  const [squad, setSquad] = useState(loadSquad)
   const [initialBest] = useState(loadBest)
 
   useEffect(() => {
@@ -31,6 +32,11 @@ export function GamePage() {
     engineRef.current?.setSensitivity(value)
   }
 
+  const changeSquad = (value: number) => {
+    setSquad(value)
+    engineRef.current?.setSquad(value)
+  }
+
   return (
     <main className="game">
       <canvas ref={canvasRef} className="game-canvas" />
@@ -40,10 +46,12 @@ export function GamePage() {
         result={result}
         best={result?.best ?? initialBest}
         sensitivity={sensitivity}
+        squad={squad}
         onStart={() => engineRef.current?.start()}
         onResume={() => engineRef.current?.resume()}
         onQuit={() => engineRef.current?.quit()}
         onSensitivity={changeSensitivity}
+        onSquad={changeSquad}
       />
     </main>
   )

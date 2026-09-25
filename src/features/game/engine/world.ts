@@ -1,4 +1,5 @@
 import type {
+  Ally,
   AmmoType,
   Enemy,
   EnemyKind,
@@ -10,6 +11,7 @@ import type {
   Player,
   Point,
   Projectile,
+  SquadMember,
   WeaponId,
 } from '../types/types.ts'
 import type { Sfx } from './audio.ts'
@@ -87,6 +89,18 @@ const UNLOCKS: Partial<Record<number, { weapon: WeaponId; ammo: AmmoType; amount
   4: { weapon: 'sniper', ammo: 'bullets', amount: 20 },
 }
 export const INSPECT_TIME = 2.4
+export const MAX_SQUAD = 3
+const ALLY_NAMES = ['Alpha', 'Bravo', 'Charlie']
+const ALLY_HP = 120
+const ALLY_ARMOR = 0.6
+const ALLY_SPEED = 3.4
+const ALLY_RANGE = 15
+const ALLY_AGGRO = 8
+const ALLY_LEASH = 6
+const ALLY_REACTION = 0.35
+const ALLY_SPREAD = 0.05
+const ALLY_DAMAGE: [number, number] = [9, 13]
+const SPOT_OFFSETS = [0.5, -0.5, 1.2, -1.2, 0, 1.9, -1.9, 2.6, -2.6]
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min)
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
@@ -140,6 +154,8 @@ export class World {
   projectiles: Projectile[] = []
   particles: Particle[] = []
   pickups: Pickup[] = []
+  allies: Ally[] = []
+  squad = 0
   wave = 0
   score = 0
   kills = 0
@@ -154,6 +170,8 @@ export class World {
   private spawnQueue: EnemyKind[] = []
   private spawnTimer = 0
   private waveTimer = 0
+  private squadHud: SquadMember[] = []
+  private squadKey = ''
 
   constructor(sfx: Sfx) {
     this.sfx = sfx
@@ -173,6 +191,8 @@ export class World {
     this.spawnQueue = []
     this.spawnTimer = 0
     this.waveTimer = 2.5
+    this.squadKey = '-'
+    this.spawnAllies()
     this.announce('Get ready')
   }
 
@@ -195,6 +215,7 @@ export class World {
 
     this.flow.update(p.x, p.y)
     this.updateEnemies(dt)
+    this.updateAllies(dt)
     this.updateProjectiles(dt)
     this.updateParticles(dt)
     this.updateWaves(dt)
@@ -202,6 +223,11 @@ export class World {
 
   hud(): HudState {
     const p = this.player
+    const key = this.allies.map((a) => Math.ceil((a.hp / ALLY_HP) * 100)).join()
+    if (key !== this.squadKey) {
+      this.squadKey = key
+      this.squadHud = this.allies.map((a) => ({ name: a.name, health: Math.ceil((a.hp / ALLY_HP) * 100) }))
+    }
     return {
       health: Math.ceil(p.health),
       mag: p.mag[p.weapon],
@@ -212,6 +238,7 @@ export class World {
       shells: p.ammo.shells,
       weapon: p.weapon,
       owned: p.owned,
+      squad: this.squadHud,
       score: this.score,
       wave: this.wave,
       enemiesLeft: this.spawnQueue.length + this.enemies.filter((e) => e.state !== 'dead').length,
@@ -387,39 +414,46 @@ export class World {
 
     const spread = spec.spread + (spec.aimSpread - spec.spread) * p.aim + Math.min(1, p.moving) * 0.012
     const damage = new Map<Enemy, number>()
+    for (let i = 0; i < spec.pellets; i++) {
+      this.trace(p, p.angle + rand(-spread, spread), spec.pierce, spec.damage, p.pitch, damage)
+    }
+    for (const [enemy, amount] of damage) this.damageEnemy(enemy, amount)
+  }
+
+  private trace(
+    origin: Point,
+    angle: number,
+    pierce: number,
+    range: [number, number],
+    pitch: number,
+    damage: Map<Enemy, number>,
+  ) {
+    const dx = Math.cos(angle)
+    const dy = Math.sin(angle)
+    const wall = castRay(origin.x, origin.y, dx, dy, this.hit).dist
     const hits: { enemy: Enemy; along: number }[] = []
 
-    for (let i = 0; i < spec.pellets; i++) {
-      const angle = p.angle + rand(-spread, spread)
-      const dx = Math.cos(angle)
-      const dy = Math.sin(angle)
-      const wall = castRay(p.x, p.y, dx, dy, this.hit).dist
-
-      hits.length = 0
-      for (const e of this.enemies) {
-        if (e.state === 'dead') continue
-        const ex = e.x - p.x
-        const ey = e.y - p.y
-        const along = ex * dx + ey * dy
-        if (along <= 0 || along >= wall) continue
-        if (Math.abs(ex * dy - ey * dx) < ENEMY_STATS[e.kind].radius * 1.15) hits.push({ enemy: e, along })
-      }
-      hits.sort((a, b) => a.along - b.along)
-
-      const pierced = hits.slice(0, spec.pierce)
-      pierced.forEach(({ enemy, along }, order) => {
-        const amount = rand(...spec.damage) * 0.7 ** order
-        damage.set(enemy, (damage.get(enemy) ?? 0) + amount)
-        this.burst(p.x + dx * along, p.y + dy * along, ENEMY_STATS[enemy.kind].size * 0.6, 'blood', 4)
-      })
-
-      if (pierced.length < spec.pierce) {
-        const z = clamp(0.5 + p.pitch * 0.43 * wall, 0.05, 0.95)
-        this.burst(p.x + dx * (wall - 0.04), p.y + dy * (wall - 0.04), z, 'spark', 3)
-      }
+    for (const e of this.enemies) {
+      if (e.state === 'dead') continue
+      const ex = e.x - origin.x
+      const ey = e.y - origin.y
+      const along = ex * dx + ey * dy
+      if (along <= 0 || along >= wall) continue
+      if (Math.abs(ex * dy - ey * dx) < ENEMY_STATS[e.kind].radius * 1.15) hits.push({ enemy: e, along })
     }
+    hits.sort((a, b) => a.along - b.along)
 
-    for (const [enemy, amount] of damage) this.damageEnemy(enemy, amount)
+    const pierced = hits.slice(0, pierce)
+    pierced.forEach(({ enemy, along }, order) => {
+      const amount = rand(...range) * 0.7 ** order
+      damage.set(enemy, (damage.get(enemy) ?? 0) + amount)
+      this.burst(origin.x + dx * along, origin.y + dy * along, ENEMY_STATS[enemy.kind].size * 0.6, 'blood', 4)
+    })
+
+    if (pierced.length < pierce) {
+      const z = clamp(0.5 + pitch * 0.43 * wall, 0.05, 0.95)
+      this.burst(origin.x + dx * (wall - 0.04), origin.y + dy * (wall - 0.04), z, 'spark', 3)
+    }
   }
 
   private damageEnemy(e: Enemy, amount: number) {
@@ -482,6 +516,139 @@ export class World {
     this.sfx.play('playerHurt')
   }
 
+  private damageAlly(a: Ally, amount: number) {
+    a.hp = Math.max(0, a.hp - amount * ALLY_ARMOR)
+    a.flash = 0.15
+    if (a.hp > 0) return
+    a.target = null
+    a.walk = 0
+    this.burst(a.x, a.y, 0.4, 'blood', 10)
+    this.sfx.play('playerHurt', this.volumeAt(a) * 0.6)
+    this.announce(`${a.name} is down`)
+  }
+
+  private updateAllies(dt: number) {
+    const p = this.player
+
+    this.allies.forEach((a, index) => {
+      a.flash = Math.max(0, a.flash - dt)
+      a.muzzle = Math.max(0, a.muzzle - dt)
+      if (a.hp <= 0) return
+
+      a.cooldown -= dt
+      a.think -= dt
+      if (a.target?.state === 'dead') a.target = null
+      if (a.think <= 0) {
+        a.think = 0.3
+        const previous = a.target
+        a.target = this.findTarget(a)
+        if (a.target && a.target !== previous) a.cooldown = Math.max(a.cooldown, ALLY_REACTION)
+      }
+
+      const px = p.x - a.x
+      const py = p.y - a.y
+      const toPlayer = Math.hypot(px, py)
+      const leash = a.target ? ALLY_LEASH : 2 + index * 0.6
+      let mx = 0
+      let my = 0
+
+      if (p.health > 0 && toPlayer > leash) {
+        if (toPlayer < 10 && hasLineOfSight(a.x, a.y, p.x, p.y)) {
+          mx = px / toPlayer
+          my = py / toPlayer
+        } else if (this.flow.next(a.x, a.y, this.waypoint)) {
+          const wx = this.waypoint.x - a.x
+          const wy = this.waypoint.y - a.y
+          const wl = Math.hypot(wx, wy) || 1
+          mx = wx / wl
+          my = wy / wl
+        }
+      }
+
+      const push = (x: number, y: number, min: number) => {
+        const ox = a.x - x
+        const oy = a.y - y
+        const d = Math.hypot(ox, oy)
+        if (d < min && d > 1e-4) {
+          mx += (ox / d) * 0.9
+          my += (oy / d) * 0.9
+        }
+      }
+      push(p.x, p.y, 1.2)
+      for (const other of this.allies) if (other !== a && other.hp > 0) push(other.x, other.y, 0.7)
+
+      const rightX = -Math.sin(p.angle)
+      const rightY = Math.cos(p.angle)
+      const ahead = -px * Math.cos(p.angle) - py * Math.sin(p.angle)
+      const side = -px * rightX - py * rightY
+      if (ahead > 0 && ahead < 5 && Math.abs(side) < 0.9) {
+        const away = side >= 0 ? 1 : -1
+        mx += rightX * away * 1.2
+        my += rightY * away * 1.2
+      }
+      for (const e of this.enemies) if (e.state !== 'dead') push(e.x, e.y, ENEMY_STATS[e.kind].radius + PLAYER_RADIUS)
+
+      const length = Math.hypot(mx, my)
+      if (length > 0.01) {
+        const speed = toPlayer > 5 ? ALLY_SPEED * 1.35 : ALLY_SPEED
+        const step = (speed * dt) / Math.max(1, length)
+        const bx = a.x
+        const by = a.y
+        slide(a, mx * step, my * step, PLAYER_RADIUS)
+        a.walk += Math.hypot(a.x - bx, a.y - by) * 2.5
+      }
+
+      if (a.target && a.cooldown <= 0) this.allyFire(a, a.target)
+    })
+  }
+
+  private findTarget(a: Ally): Enemy | null {
+    const nearby = this.enemies
+      .filter((e) => e.state !== 'dead' && Math.hypot(e.x - a.x, e.y - a.y) < ALLY_RANGE)
+      .sort((m, n) => Math.hypot(m.x - a.x, m.y - a.y) - Math.hypot(n.x - a.x, n.y - a.y))
+    return nearby.slice(0, 4).find((e) => hasLineOfSight(a.x, a.y, e.x, e.y)) ?? null
+  }
+
+  private allyFire(a: Ally, target: Enemy) {
+    a.cooldown = rand(0.3, 0.55)
+    a.muzzle = 0.08
+    const angle = Math.atan2(target.y - a.y, target.x - a.x) + rand(-ALLY_SPREAD, ALLY_SPREAD)
+    const damage = new Map<Enemy, number>()
+    this.trace(a, angle, 1, ALLY_DAMAGE, 0, damage)
+    for (const [enemy, amount] of damage) this.damageEnemy(enemy, amount)
+    this.sfx.play('rifle', this.volumeAt(a) * 0.45)
+  }
+
+  private spawnAllies() {
+    this.allies = []
+    ALLY_NAMES.slice(0, this.squad).forEach((name) => {
+      this.allies.push({
+        ...this.spotNear(this.player),
+        name,
+        hp: ALLY_HP,
+        cooldown: 0,
+        think: 0,
+        walk: 0,
+        flash: 0,
+        muzzle: 0,
+        target: null,
+      })
+    })
+  }
+
+  private spotNear(center: Point): Point {
+    for (let ring = 1; ring <= 3; ring++) {
+      for (const offset of SPOT_OFFSETS) {
+        const angle = this.player.angle + Math.PI + offset
+        const x = center.x + Math.cos(angle) * (0.6 + ring * 0.8)
+        const y = center.y + Math.sin(angle) * (0.6 + ring * 0.8)
+        const taken = this.allies.some((a) => Math.hypot(a.x - x, a.y - y) < 0.6)
+        if (!collides(x, y, PLAYER_RADIUS) && !taken && hasLineOfSight(center.x, center.y, x, y)) return { x, y }
+      }
+    }
+    return { x: center.x, y: center.y }
+  }
+
   private updateEnemies(dt: number) {
     const p = this.player
     const alive = p.health > 0
@@ -495,15 +662,12 @@ export class World {
       }
 
       const stats = ENEMY_STATS[e.kind]
-      const dx = p.x - e.x
-      const dy = p.y - e.y
-      const dist = Math.hypot(dx, dy)
       e.cooldown -= dt
 
       if (e.state === 'attack') {
         e.timer -= dt
         if (e.timer <= 0) {
-          this.resolveAttack(e, dist)
+          this.resolveAttack(e)
           e.state = 'chase'
           e.cooldown = stats.cooldown * rand(0.8, 1.3)
         }
@@ -516,7 +680,12 @@ export class World {
         continue
       }
 
-      const sees = alive && dist < 18 && hasLineOfSight(e.x, e.y, p.x, p.y)
+      e.target = this.pickTarget(e)
+      const goal: Point = e.target ?? p
+      const dx = goal.x - e.x
+      const dy = goal.y - e.y
+      const dist = Math.hypot(dx, dy)
+      const sees = (e.target !== null || alive) && dist < 18 && hasLineOfSight(e.x, e.y, goal.x, goal.y)
       if (sees && e.cooldown <= 0 && dist <= stats.range) {
         e.state = 'attack'
         e.timer = stats.windup
@@ -574,13 +743,32 @@ export class World {
     }
   }
 
-  private resolveAttack(e: Enemy, dist: number) {
+  private pickTarget(e: Enemy): Ally | null {
+    const p = this.player
+    let best: Ally | null = null
+    let bestDist = p.health > 0 ? Math.hypot(p.x - e.x, p.y - e.y) : Infinity
+
+    for (const a of this.allies) {
+      if (a.hp <= 0) continue
+      const d = Math.hypot(a.x - e.x, a.y - e.y)
+      if (d < bestDist && d < ALLY_AGGRO) {
+        best = a
+        bestDist = d
+      }
+    }
+    return best && hasLineOfSight(e.x, e.y, best.x, best.y) ? best : null
+  }
+
+  private resolveAttack(e: Enemy) {
     const stats = ENEMY_STATS[e.kind]
     const p = this.player
-    if (p.health <= 0) return
+    const ally = e.target && e.target.hp > 0 ? e.target : null
+    if (!ally && p.health <= 0) return
+    const goal: Point = ally ?? p
+    const dist = Math.hypot(goal.x - e.x, goal.y - e.y)
 
     if (stats.ranged) {
-      const angle = Math.atan2(p.y - e.y, p.x - e.x) + rand(-0.06, 0.06)
+      const angle = Math.atan2(goal.y - e.y, goal.x - e.x) + rand(-0.06, 0.06)
       const speed = 8
       this.projectiles.push({
         x: e.x + Math.cos(angle) * 0.35,
@@ -596,7 +784,9 @@ export class World {
     }
 
     this.sfx.play('swing', this.volumeAt(e))
-    if (dist <= stats.range + 0.25) this.damagePlayer(rand(...stats.damage))
+    if (dist > stats.range + 0.25) return
+    if (ally) this.damageAlly(ally, rand(...stats.damage))
+    else this.damagePlayer(rand(...stats.damage))
   }
 
   private updateProjectiles(dt: number) {
@@ -613,6 +803,13 @@ export class World {
 
       if (p.health > 0 && Math.hypot(p.x - shot.x, p.y - shot.y) < PLAYER_RADIUS + 0.15) {
         this.damagePlayer(shot.damage)
+        this.burst(shot.x, shot.y, shot.z, 'ember', 8)
+        return false
+      }
+
+      const ally = this.allies.find((a) => a.hp > 0 && Math.hypot(a.x - shot.x, a.y - shot.y) < PLAYER_RADIUS + 0.15)
+      if (ally) {
+        this.damageAlly(ally, shot.damage)
         this.burst(shot.x, shot.y, shot.z, 'ember', 8)
         return false
       }
@@ -698,6 +895,10 @@ export class World {
     this.spawnTimer = 0.6
     this.enemies = this.enemies.filter((e) => e.state !== 'dead')
     for (const pickup of this.pickups) pickup.active = true
+    for (const a of this.allies) {
+      if (a.hp <= 0) Object.assign(a, this.spotNear(this.player))
+      a.hp = ALLY_HP
+    }
 
     const unlock = UNLOCKS[n]
     if (unlock && !this.player.owned.includes(unlock.weapon)) {
@@ -752,6 +953,7 @@ export class World {
       flash: 0,
       strafe: 1,
       strafeTime: 0,
+      target: null,
     })
     this.burst(x, y, 0.5, 'portal', 14)
     this.sfx.play('spawn', this.volumeAt({ x, y }) * 0.8)
